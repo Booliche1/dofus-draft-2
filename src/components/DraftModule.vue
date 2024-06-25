@@ -1,12 +1,99 @@
 <template>
   <div class="container">
-    <!-- Votre code HTML ici -->
+    <h1>Dofus Draft Module</h1>
+    <div class="draft">
+      <div class="team">
+        <h2>
+          <input
+            type="text"
+            v-model="draftData.teamAName"
+            @input="adjustInputWidth($event.target)"
+            @change="updateTeamName('A')"
+            placeholder="Team A"
+          />
+        </h2>
+        <button :disabled="selectedTeam === 'A'" @click="selectTeam('A')">Sélectionner Team A</button>
+        <div class="picks-section">
+          <h3 class="section-title">Picks</h3>
+          <div class="picks">
+            <img v-for="(pick, index) in draftData.teamAPicks" :key="index" :src="getPickImage(pick)" :alt="pick" />
+          </div>
+        </div>
+        <div class="bans-section">
+          <h3 class="section-title">Bans</h3>
+          <div class="bans">
+            <img v-for="(ban, index) in draftData.teamABans" :key="index" :src="getPickImage(ban)" :alt="ban" />
+          </div>
+        </div>
+      </div>
+      <div class="team">
+        <h2>
+          <input
+            type="text"
+            v-model="draftData.teamBName"
+            @input="adjustInputWidth($event.target)"
+            @change="updateTeamName('B')"
+            placeholder="Team B"
+          />
+        </h2>
+        <button :disabled="selectedTeam === 'B'" @click="selectTeam('B')">Sélectionner Team B</button>
+        <div class="picks-section">
+          <h3 class="section-title">Picks</h3>
+          <div class="picks">
+            <img v-for="(pick, index) in draftData.teamBPicks" :key="index" :src="getPickImage(pick)" :alt="pick" />
+          </div>
+        </div>
+        <div class="bans-section">
+          <h3 class="section-title">Bans</h3>
+          <div class="bans">
+            <img v-for="(ban, index) in draftData.teamBBans" :key="index" :src="getPickImage(ban)" :alt="ban" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="map-section">
+      <h2 class="section-title">Map</h2>
+      <input type="text" v-model="draftData.mapInput" placeholder="Enter map code (e.g., A1)" @change="updateMapImage" />
+      <img v-if="draftData.mapImage" :src="draftData.mapImage" :alt="`Carte ${draftData.mapInput}`" />
+    </div>
+    <div class="controls">
+      <button @click="resetDraft">Reset Draft</button>
+      <button @click="generateRandomDraft">Draft Aléatoire</button>
+    </div>
+    <div class="selection" v-show="!draftData.draftCompleted">
+      <h3 v-html="selectionTitle"></h3>
+      <div class="class-grid">
+        <img
+          v-for="cls in availableClasses"
+          :key="cls"
+          :src="getPickImage(cls)"
+          :alt="cls"
+          :class="{ disabled: selectedTeam !== draftOrder[draftData.currentStep].team }"
+          @click="confirmSelection(cls)"
+        />
+      </div>
+    </div>
+    <div v-show="draftData.draftCompleted" class="results-section">
+      <h2>Résultats de la Draft</h2>
+      <div class="results-container">
+        <div class="team-result">
+          <h2>{{ draftData.teamAName }}</h2>
+          <div class="picks">
+            <img v-for="(pick, index) in draftData.teamAPicks" :key="index" :src="getResultImage(pick)" :alt="pick" />
+          </div>
+        </div>
+        <div class="team-result">
+          <h2>{{ draftData.teamBName }}</h2>
+          <div class="picks">
+            <img v-for="(pick, index) in draftData.teamBPicks" :key="index" :src="getResultImage(pick)" :alt="pick" />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { supabase } from '@/supabase'
-
 export default {
   data() {
     return {
@@ -51,36 +138,19 @@ export default {
       return `${teamName} choisi une classe à <span class="${action === 'ban' ? 'ban-text' : 'pick-text'}">${actionText}</span>`;
     }
   },
-  async mounted() {
+  mounted() {
     this.resetDraft();
-    this.setupRealtimeListener();
+    this.initializeAvailableClasses();
   },
   methods: {
-    async setupRealtimeListener() {
-      const subscription = supabase
-        .from('draft')
-        .on('UPDATE', payload => {
-          this.draftData = payload.new;
-        })
-        .subscribe();
-
-      const { data } = await supabase
-        .from('draft')
-        .select('*')
-        .single();
-
-      if (data) {
-        this.draftData = data;
-      } else {
-        console.error('Erreur lors de la récupération des données');
-      }
+    initializeAvailableClasses() {
+      this.availableClasses = [...this.classes];
     },
     adjustInputWidth(input) {
       input.style.width = `${input.value.length + 1}ch`;
     },
     selectTeam(team) {
       this.draftData.selectedTeam = team;
-      this.updateDraftData();
     },
     updateTeamName(team) {
       if (team === 'A') {
@@ -88,7 +158,6 @@ export default {
       } else {
         this.draftData.teamBName = event.target.value;
       }
-      this.updateDraftData();
     },
     resetDraft() {
       this.draftData = {
@@ -104,7 +173,7 @@ export default {
         mapInput: '',
         mapImage: ''
       };
-      this.updateDraftData();
+      this.initializeAvailableClasses();
       this.nextStep();
     },
     nextStep() {
@@ -113,7 +182,6 @@ export default {
         this.generateFinalDraft();
         return;
       }
-      this.updateDraftData();
     },
     confirmSelection(selectedClass) {
       if (this.draftData.draftCompleted || this.draftData.selectedTeam !== this.draftOrder[this.draftData.currentStep].team) return;
@@ -138,15 +206,12 @@ export default {
       } else {
         this.generateFinalDraft();
       }
-      this.updateDraftData();
     },
     generateFinalDraft() {
       this.draftData.draftCompleted = true;
-      this.updateDraftData();
     },
     updateMapImage() {
       this.draftData.mapImage = this.draftData.mapInput ? `maps/${this.draftData.mapInput}.png` : '';
-      this.updateDraftData();
     },
     generateRandomDraft() {
       this.resetDraft();
@@ -177,12 +242,6 @@ export default {
     },
     getResultImage(className) {
       return `classes/${className}.png`;
-    },
-    updateDraftData() {
-      supabase
-        .from('draft')
-        .update(this.draftData)
-        .eq('id', 1);
     }
   }
 };
@@ -213,6 +272,7 @@ body, html {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 h1 {
   text-align: center;
@@ -223,6 +283,7 @@ h1 {
   display: flex;
   justify-content: space-between;
   flex-grow: 1;
+  flex-wrap: wrap;
 }
 .team {
   width: 45%;
@@ -352,7 +413,7 @@ input[type="text"] {
 }
 .team-result .picks img {
   width: 150px;
-  height: 150px;
+  height: 450px;
   margin: 5px;
   border: 2px solid #ffffff;
   border-radius: 5px;
