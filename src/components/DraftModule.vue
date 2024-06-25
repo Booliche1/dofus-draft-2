@@ -402,7 +402,7 @@ input[type="text"] {
 }
 .team-result .picks img {
   width: 150px;
-  height: 150px;
+  height: 450px;
   margin: 5px;
   border: 2px solid #ffffff;
   border-radius: 5px;
