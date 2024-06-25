@@ -6,23 +6,23 @@
         <h2>
           <input
             type="text"
-            v-model="teamAName"
+            v-model="draftData.teamAName"
             @input="adjustInputWidth($event.target)"
             @change="updateTeamName('A')"
             placeholder="Team A"
           />
         </h2>
-        <button @click="selectTeam('A')">Sélectionner Team A</button>
+        <button :disabled="selectedTeam === 'A'" @click="selectTeam('A')">Sélectionner Team A</button>
         <div class="picks-section">
           <h3 class="section-title">Picks</h3>
           <div class="picks">
-            <img v-for="(pick, index) in teamAPicks" :key="index" :src="getPickImage(pick)" :alt="pick" />
+            <img v-for="(pick, index) in draftData.teamAPicks" :key="index" :src="getPickImage(pick)" :alt="pick" />
           </div>
         </div>
         <div class="bans-section">
           <h3 class="section-title">Bans</h3>
           <div class="bans">
-            <img v-for="(ban, index) in teamABans" :key="index" :src="getPickImage(ban)" :alt="ban" />
+            <img v-for="(ban, index) in draftData.teamABans" :key="index" :src="getPickImage(ban)" :alt="ban" />
           </div>
         </div>
       </div>
@@ -30,37 +30,37 @@
         <h2>
           <input
             type="text"
-            v-model="teamBName"
+            v-model="draftData.teamBName"
             @input="adjustInputWidth($event.target)"
             @change="updateTeamName('B')"
             placeholder="Team B"
           />
         </h2>
-        <button @click="selectTeam('B')">Sélectionner Team B</button>
+        <button :disabled="selectedTeam === 'B'" @click="selectTeam('B')">Sélectionner Team B</button>
         <div class="picks-section">
           <h3 class="section-title">Picks</h3>
           <div class="picks">
-            <img v-for="(pick, index) in teamBPicks" :key="index" :src="getPickImage(pick)" :alt="pick" />
+            <img v-for="(pick, index) in draftData.teamBPicks" :key="index" :src="getPickImage(pick)" :alt="pick" />
           </div>
         </div>
         <div class="bans-section">
           <h3 class="section-title">Bans</h3>
           <div class="bans">
-            <img v-for="(ban, index) in teamBBans" :key="index" :src="getPickImage(ban)" :alt="ban" />
+            <img v-for="(ban, index) in draftData.teamBBans" :key="index" :src="getPickImage(ban)" :alt="ban" />
           </div>
         </div>
       </div>
     </div>
     <div class="map-section">
       <h2 class="section-title">Map</h2>
-      <input type="text" v-model="mapInput" placeholder="Enter map code (e.g., A1)" @change="updateMapImage" />
-      <img v-if="mapImage" :src="mapImage" :alt="`Carte ${mapInput}`" />
+      <input type="text" v-model="draftData.mapInput" placeholder="Enter map code (e.g., A1)" @change="updateMapImage" />
+      <img v-if="draftData.mapImage" :src="draftData.mapImage" :alt="`Carte ${draftData.mapInput}`" />
     </div>
     <div class="controls">
       <button @click="resetDraft">Reset Draft</button>
       <button @click="generateRandomDraft">Draft Aléatoire</button>
     </div>
-    <div class="selection" v-show="!draftCompleted">
+    <div class="selection" v-show="!draftData.draftCompleted">
       <h3 v-html="selectionTitle"></h3>
       <div class="class-grid">
         <img
@@ -68,24 +68,24 @@
           :key="cls"
           :src="getPickImage(cls)"
           :alt="cls"
-          :class="{ disabled: selectedTeam !== draftOrder[currentStep].team }"
+          :class="{ disabled: selectedTeam !== draftOrder[draftData.currentStep].team }"
           @click="confirmSelection(cls)"
         />
       </div>
     </div>
-    <div v-show="draftCompleted" class="results-section">
+    <div v-show="draftData.draftCompleted" class="results-section">
       <h2>Résultats de la Draft</h2>
       <div class="results-container">
         <div class="team-result">
-          <h2>{{ teamAName }}</h2>
+          <h2>{{ draftData.teamAName }}</h2>
           <div class="picks">
-            <img v-for="(pick, index) in teamAPicks" :key="index" :src="getResultImage(pick)" :alt="pick" />
+            <img v-for="(pick, index) in draftData.teamAPicks" :key="index" :src="getResultImage(pick)" :alt="pick" />
           </div>
         </div>
         <div class="team-result">
-          <h2>{{ teamBName }}</h2>
+          <h2>{{ draftData.teamBName }}</h2>
           <div class="picks">
-            <img v-for="(pick, index) in teamBPicks" :key="index" :src="getResultImage(pick)" :alt="pick" />
+            <img v-for="(pick, index) in draftData.teamBPicks" :key="index" :src="getResultImage(pick)" :alt="pick" />
           </div>
         </div>
       </div>
@@ -94,21 +94,29 @@
 </template>
 
 <script>
+import { supabase } from '@/supabase'
+
 export default {
   data() {
     return {
       classes: [
-        'Ecaflip', 'Eniripsa', 'Iop', 'Cra', 'Feca', 'Sacrieur', 'Sadida', 
-        'Osamodas', 'Enutrof', 'Sram', 'Xelor', 'Pandawa', 'Roublard', 
+        'Ecaflip', 'Eniripsa', 'Iop', 'Cra', 'Feca', 'Sacrieur', 'Sadida',
+        'Osamodas', 'Enutrof', 'Sram', 'Xelor', 'Pandawa', 'Roublard',
         'Zobal', 'Steamer', 'Eliotrope', 'Huppermage', 'Ouginak', 'Forgelance'
       ],
-      teamAName: 'Team A',
-      teamBName: 'Team B',
-      teamAPicks: [],
-      teamABans: [],
-      teamBPicks: [],
-      teamBBans: [],
-      availableClasses: [],
+      draftData: {
+        teamAName: "Team A",
+        teamBName: "Team B",
+        teamAPicks: [],
+        teamABans: [],
+        teamBPicks: [],
+        teamBBans: [],
+        currentStep: 0,
+        draftCompleted: false,
+        selectedTeam: '',
+        mapInput: '',
+        mapImage: ''
+      },
       draftOrder: [
         { team: 'A', action: 'ban' }, { team: 'B', action: 'ban' },
         { team: 'A', action: 'ban' }, { team: 'B', action: 'ban' },
@@ -119,90 +127,113 @@ export default {
         { team: 'A', action: 'ban' }, { team: 'B', action: 'ban' },
         { team: 'A', action: 'pick' }, { team: 'B', action: 'pick' }
       ],
-      currentStep: 0,
-      draftCompleted: false,
-      selectedTeam: '',
-      mapInput: '',
-      mapImage: ''
+      availableClasses: [],
+      selectedTeam: ''
     };
   },
   computed: {
     selectionTitle() {
-      if (this.draftCompleted) return '';
-      const { team, action } = this.draftOrder[this.currentStep];
-      const teamName = team === 'A' ? this.teamAName : this.teamBName;
+      if (this.draftData.draftCompleted) return '';
+      const { team, action } = this.draftOrder[this.draftData.currentStep];
+      const teamName = team === 'A' ? this.draftData.teamAName : this.draftData.teamBName;
       const actionText = action.toUpperCase();
       return `${teamName} choisi une classe à <span class="${action === 'ban' ? 'ban-text' : 'pick-text'}">${actionText}</span>`;
     }
   },
-  mounted() {
+  async mounted() {
     this.resetDraft();
+    this.setupRealtimeListener();
   },
   methods: {
+    async setupRealtimeListener() {
+      supabase
+        .from('draft')
+        .on('UPDATE', payload => {
+          this.draftData = payload.new;
+        })
+        .subscribe();
+
+      const { data, error } = await supabase
+        .from('draft')
+        .select('*')
+        .single();
+
+      if (data) {
+        this.draftData = data;
+      }
+    },
     adjustInputWidth(input) {
       input.style.width = `${input.value.length + 1}ch`;
     },
     selectTeam(team) {
-      this.selectedTeam = team;
+      this.draftData.selectedTeam = team;
+      this.updateDraftData();
     },
     updateTeamName(team) {
       if (team === 'A') {
-        this.teamAName = event.target.value;
+        this.draftData.teamAName = event.target.value;
       } else {
-        this.teamBName = event.target.value;
+        this.draftData.teamBName = event.target.value;
       }
+      this.updateDraftData();
     },
     resetDraft() {
-      this.availableClasses = [...this.classes];
-      this.teamAPicks = [];
-      this.teamABans = [];
-      this.teamBPicks = [];
-      this.teamBBans = [];
-      this.currentStep = 0;
-      this.draftCompleted = false;
-      this.selectedTeam = '';
-      this.mapInput = '';
-      this.mapImage = '';
+      this.draftData = {
+        teamAName: 'Team A',
+        teamBName: 'Team B',
+        teamAPicks: [],
+        teamABans: [],
+        teamBPicks: [],
+        teamBBans: [],
+        currentStep: 0,
+        draftCompleted: false,
+        selectedTeam: '',
+        mapInput: '',
+        mapImage: ''
+      };
+      this.updateDraftData();
       this.nextStep();
     },
     nextStep() {
-      if (this.currentStep >= this.draftOrder.length) {
-        this.draftCompleted = true;
+      if (this.draftData.currentStep >= this.draftOrder.length) {
+        this.draftData.draftCompleted = true;
         this.generateFinalDraft();
         return;
       }
-      this.$forceUpdate();
+      this.updateDraftData();
     },
     confirmSelection(selectedClass) {
-      if (this.draftCompleted || this.selectedTeam !== this.draftOrder[this.currentStep].team) return;
-      const { team, action } = this.draftOrder[this.currentStep];
+      if (this.draftData.draftCompleted || this.draftData.selectedTeam !== this.draftOrder[this.draftData.currentStep].team) return;
+      const { team, action } = this.draftOrder[this.draftData.currentStep];
       if (action === 'ban') {
         if (team === 'A') {
-          this.teamABans.push(selectedClass);
+          this.draftData.teamABans.push(selectedClass);
         } else {
-          this.teamBBans.push(selectedClass);
+          this.draftData.teamBBans.push(selectedClass);
         }
       } else {
         if (team === 'A') {
-          this.teamAPicks.push(selectedClass);
+          this.draftData.teamAPicks.push(selectedClass);
         } else {
-          this.teamBPicks.push(selectedClass);
+          this.draftData.teamBPicks.push(selectedClass);
         }
       }
       this.availableClasses = this.availableClasses.filter(cls => cls !== selectedClass);
-      this.currentStep++;
-      if (this.currentStep < this.draftOrder.length) {
+      this.draftData.currentStep++;
+      if (this.draftData.currentStep < this.draftOrder.length) {
         this.nextStep();
       } else {
         this.generateFinalDraft();
       }
+      this.updateDraftData();
     },
     generateFinalDraft() {
-      this.draftCompleted = true;
-      this.$forceUpdate();
+      this.draftData.draftCompleted = true;
+      this.updateDraftData();
     },
     updateMapImage() {
-      this.mapImage = this.mapInput ? `maps/${this.mapInput}.png` : '';
+      this.draftData.mapImage = this.draftData.mapInput ? `maps/${this.draftData.mapInput}.png` : '';
+      this.updateDraftData();
     },
     generateRandomDraft() {
       this.resetDraft();
@@ -212,19 +243,19 @@ export default {
         const randomClass = randomClasses.splice(randomIndex, 1)[0];
         if (action === 'ban') {
           if (team === 'A') {
-            this.teamABans.push(randomClass);
+            this.draftData.teamABans.push(randomClass);
           } else {
-            this.teamBBans.push(randomClass);
+            this.draftData.teamBBans.push(randomClass);
           }
         } else {
           if (team === 'A') {
-            this.teamAPicks.push(randomClass);
+            this.draftData.teamAPicks.push(randomClass);
           } else {
-            this.teamBPicks.push(randomClass);
+            this.draftData.teamBPicks.push(randomClass);
           }
         }
       });
-      this.mapInput = `A${Math.floor(Math.random() * 50) + 1}`;
+      this.draftData.mapInput = `A${Math.floor(Math.random() * 50) + 1}`;
       this.updateMapImage();
       this.generateFinalDraft();
     },
@@ -233,6 +264,12 @@ export default {
     },
     getResultImage(className) {
       return `classes/${className}.png`;
+    },
+    updateDraftData() {
+      supabase
+        .from('draft')
+        .update(this.draftData)
+        .eq('id', 1);
     }
   }
 };
