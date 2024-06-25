@@ -413,7 +413,7 @@ input[type="text"] {
 }
 .team-result .picks img {
   width: 150px;
-  height: 450px;
+  height: 250px;
   margin: 5px;
   border: 2px solid #ffffff;
   border-radius: 5px;
